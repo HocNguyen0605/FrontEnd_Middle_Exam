@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rắn săn mồi</title>
+  <style>
+    :root {
+      --bg: #eef1e6;
+      --ink: #1f2a24;
+      --muted: #5d6b62;
+      --line: #c9d3bd;
+      --cell-a: #e3e9d6;
+      --cell-b: #d9e1ca;
+      --snake: #2f6b4f;
+      --snake-head: #173c2b;
+      --food: #e4572e;
+      --wall: #4a4a42;
+      --accent: #2f6b4f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial  ;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    h1 { margin: 0 0 4px; font-size: 2rem; letter-spacing: 0.5px; }
+    .subtitle { margin: 0 0 28px; color: var(--muted); }
+
+    .hidden { display: none !important; }
+
+    /* ---------- Menu chọn level ---------- */
+    .level-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    .level-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .level-box {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.6rem;
+      font-weight: bold;
+      color: #fff;
+      background: var(--accent);
+      border-radius: 14px;
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    .level-item:hover .level-box,
+    .level-item:focus-visible .level-box { transform: translateY(-3px); background: var(--snake-head); }
+    .level-item:focus-visible { outline: 3px solid var(--food); outline-offset: 4px; border-radius: 14px; }
+
+    .level-name { font-size: 0.95rem; text-align: center; }
+
+    .level-item.locked { cursor: not-allowed; }
+    .level-item.locked .level-box { background: var(--line); color: #fff; }
+    .level-item.locked:hover .level-box { transform: none; background: var(--line); }
+    .level-item.locked .level-name { color: var(--muted); }
+
+    /* ---------- Màn chơi ---------- */
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      max-width: 460px;
+      margin-bottom: 12px;
+    }
+
+    .hud-title { font-weight: bold; }
+    .hud-score { color: var(--muted); }
+
+    .btn {
+      font: inherit;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 2px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--snake-head); border-color: var(--snake-head); }
+    .btn.secondary { background: transparent; color: var(--accent); }
+    .btn.secondary:hover { background: var(--cell-b); }
+
+    /* Bảng game: mỗi ô 22px, phần tô màu bên trong nhỏ hơn 2px (margin 1px mỗi bên) */
+    #board {
+      border-collapse: collapse;
+      border: 3px solid var(--ink);
+      background: var(--cell-a);
+    }
+    #board td { width: 22px; height: 22px; padding: 0; }
+    #board td.alt { background: var(--cell-b); }
+    #board td div { width: 20px; height: 20px; margin: 1px; border-radius: 4px; }
+    #board td div.snake { background: var(--snake); }
+    #board td div.ghost { background: #8c7ae6; opacity: 0.55; }
+    #board td div.head { background: var(--snake-head); }
+    #board td div.snake-white { background: #fff; border: 2px solid #8a948c; }
+    #board td div.head-white { background: #fff; border: 2px solid var(--ink); }
+    #board td div.active { box-shadow: inset 0 0 0 3px #f2b705; }
+    #board td div.food { background: var(--food); border-radius: 50%; }
+    #board td div.food.special { background: #f2b705; }
+    #board td div.wall { background: var(--wall); }
+
+    /* ---------- Modal ---------- */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(31, 42, 36, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 14px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .modal h2 { margin: 0 0 12px; }
+    .modal ul { margin: 0 0 20px; padding-left: 20px; line-height: 1.6; }
+    .modal p { margin: 0 0 20px; line-height: 1.6; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    @media (max-width: 480px) {
+      .level-box { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Rắn săn mồi</h1>
+  <p class="subtitle">Chọn một level để bắt đầu</p>
+
+  <!-- Màn hình menu -->
+  <section id="menuScreen" class="level-list"></section>
+
+  <!-- Màn hình chơi -->
+  <section id="gameScreen" class="hidden" style="display:flex; flex-direction:column; align-items:center; width:100%;">
+    <div class="hud">
+      <button id="backBtn" class="btn secondary">Về menu</button>
+      <span id="levelTitle" class="hud-title"></span>
+      <span id="scoreText" class="hud-score"></span>
+    </div>
+
+    <table id="board" aria-label="Bảng chơi"></table>
+
+  </section>
+
+  <!-- Modal dùng chung cho luật chơi và kết quả -->
+  <div id="modal" class="modal-backdrop hidden" aria-modal="true">
+    <div class="modal">
+      <h2 id="modalTitle"></h2>
+      <div id="modalBody"></div>
+      <div id="modalActions" class="modal-actions"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
